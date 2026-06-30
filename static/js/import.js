@@ -2,19 +2,21 @@ async function loadSources() {
   const res = await fetch("/api/sources");
   const data = await res.json();
   const el = document.getElementById("source-list");
+  const formEl = document.getElementById("source-form-area");
   if (!data.length) {
-    el.innerHTML = '<div class="empty-state">データソースが未設定です。下記フォームから追加してください。</div>' + sourceForm();
-    return;
+    el.innerHTML = '<div class="empty-state">データソースが未設定です。下記から追加してください。</div>';
+  } else {
+    el.innerHTML = `<table><thead><tr>
+      <th>名前</th><th>プラットフォーム</th><th>URL</th><th>最終取得</th><th>ステータス</th>
+    </tr></thead><tbody>${data.map(s => `<tr>
+      <td style="font-weight:600;color:var(--text-primary);">${s.name}</td>
+      <td><span class="badge platform">${s.platform}</span></td>
+      <td><a href="${s.source_url}" target="_blank" style="color:var(--accent);font-size:12px;">${(s.source_url || "").slice(0, 50)}...</a></td>
+      <td style="font-size:12px;color:var(--text-muted);">${s.last_scraped_at || "-"}</td>
+      <td>${renderStatus(s.last_status)}</td>
+    </tr>`).join("")}</tbody></table>`;
   }
-  el.innerHTML = `<table><thead><tr>
-    <th>名前</th><th>プラットフォーム</th><th>URL</th><th>最終取得</th><th>ステータス</th>
-  </tr></thead><tbody>${data.map(s => `<tr>
-    <td style="font-weight:600;color:var(--text-primary);">${s.name}</td>
-    <td><span class="badge platform">${s.platform}</span></td>
-    <td><a href="${s.source_url}" target="_blank" style="color:var(--accent);font-size:12px;">${(s.source_url || "").slice(0, 50)}...</a></td>
-    <td style="font-size:12px;color:var(--text-muted);">${s.last_scraped_at || "-"}</td>
-    <td>${renderStatus(s.last_status)}</td>
-  </tr>`).join("")}</tbody></table>` + sourceForm();
+  if (formEl) formEl.innerHTML = sourceForm();
 }
 
 function renderStatus(status) {
@@ -24,14 +26,12 @@ function renderStatus(status) {
 }
 
 function sourceForm() {
-  return `<hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
-  <h2 style="font-size:15px;">データソース追加</h2>
-  <div class="filters" style="margin-top:12px;">
+  return `<div class="filters">
     <div><label>名前</label><input type="text" id="src_name" placeholder="横浜 ペット可"></div>
     <div><label>プラットフォーム</label><select id="src_platform">
       <option value="SUUMO">SUUMO</option><option value="HOMES">HOMES</option><option value="athome">athome</option>
     </select></div>
-    <div><label>検索URL</label><input type="text" id="src_url" placeholder="https://..."></div>
+    <div><label>検索結果URL</label><input type="text" id="src_url" placeholder="https://suumo.jp/chintai/..."></div>
     <div style="flex-direction:row;align-items:flex-end;"><button class="btn btn-primary" onclick="addSource()">追加</button></div>
   </div>`;
 }
@@ -58,6 +58,28 @@ async function scrapeAll() {
     document.getElementById("scrape-result").textContent = "エラーが発生しました";
   }
   loadSources();
+}
+
+async function importDetail() {
+  const url = document.getElementById("detail-url").value.trim();
+  const el = document.getElementById("detail-result");
+  if (!url) { el.innerHTML = '<span style="color:var(--bad);">URLを入力してください</span>'; return; }
+  el.textContent = "取込中...";
+  try {
+    const res = await fetch("/api/import/detail", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const d = await res.json();
+    if (d.error) {
+      el.innerHTML = `<span style="color:var(--bad);">${d.error}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--good);">${d.message}</span>`;
+      document.getElementById("detail-url").value = "";
+    }
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--bad);">通信エラーが発生しました</span>';
+  }
 }
 
 loadSources();

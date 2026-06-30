@@ -276,6 +276,56 @@ def api_import_csv():
                     "duplicate_count": 0, "error_count": 0, "message": "csv import optional"})
 
 
+@app.route("/api/import/detail", methods=["POST"])
+def api_import_detail():
+    """粘贴单个房源详情页 URL,自动解析入库 + 评分。"""
+    from scrapers.base import fetch_html
+    from scripts.run_scrape import normalize, upsert_listing
+    from scripts.recalculate_scores import recalculate
+    from db_helper import get_conn
+
+    data = request.json or {}
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URL is required"}), 400
+
+    # 根据 URL 判断平台和解析器
+    if "suumo.jp" in url:
+        from scrapers.suumo_detail import parse_suumo_detail
+        platform = "SUUMO"
+    elif "homes.co.jp" in url:
+        return jsonify({"error": "HOMES 詳細ページ解析は未対応です。SUUMOのURLを入力してください。"}), 400
+    elif "athome.jp" in url:
+        return jsonify({"error": "athome 詳細ページ解析は未対応です。SUUMOのURLを入力してください。"}), 400
+    else:
+        return jsonify({"error": "サポートされていないURLです。SUUMOの物件詳細URLを入力してください。"}), 400
+
+    html = fetch_html(url)
+    if html is None:
+        return jsonify({"error": "ページの取得に失敗しました。robots.txtまたはネットワークエラーの可能性があります。"}), 500
+
+    try:
+        raw = parse_suumo_detail(html, url)
+        if not raw.title:
+            return jsonify({"error": "物件情報の解析に失敗しました。詳細ページのURLが正しいか確認してください。"}), 500
+    except Exception as e:
+        return jsonify({"error": f"解析エラー: {str(e)}"}), 500
+
+    conn = get_conn()
+    status, listing_id = upsert_listing(conn, normalize(raw))
+    conn.commit()
+    conn.close()
+
+    # 评分
+    recalculate()
+
+    return jsonify({
+        "status": status,
+        "title": raw.title,
+        "message": f"「{raw.title}」を{'追加' if status == 'inserted' else '更新'}しました"
+    })
+
+
 @app.route("/api/scrape", methods=["POST"])
 def api_scrape():
     from scripts.run_scrape import run_scrape
