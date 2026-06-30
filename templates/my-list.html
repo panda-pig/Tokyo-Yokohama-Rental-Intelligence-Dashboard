@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}マイリスト分析{% endblock %}
+{% block content %}
+<h1 class="page-title">マイリスト分析</h1>
+
+<!-- 指标卡 -->
+<div class="metric-grid" id="my-metrics"></div>
+
+<!-- 性价比散点(带区域基准线) -->
+<div class="card">
+  <h2>インポート物件 vs エリア平均 <span style="font-size:12px;font-weight:400;color:var(--text-muted);">点線=エリア平均</span></h2>
+  <div id="chart-scatter" class="chart"></div>
+</div>
+
+<!-- 评分雷达 -->
+<div class="card">
+  <h2>スコア比較 <span style="font-size:12px;font-weight:400;color:var(--text-muted);">8次元レーダー(最大8件)</span></h2>
+  <div id="chart-radar" class="chart"></div>
+</div>
+
+<!-- 区域偏离度 -->
+<div class="card">
+  <h2>エリア平均との偏差 <span style="font-size:12px;font-weight:400;color:var(--text-muted);">+%=高い / -%=安い</span></h2>
+  <div id="chart-deviation" class="chart"></div>
+</div>
+
+<!-- 自动对比表 -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <h2 style="padding:24px 24px 0;">全物件比較表</h2>
+  <div style="overflow-x:auto;">
+    <table id="compare-table"><thead><tr></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<!-- 状态进度 -->
+<div class="card">
+  <h2>進捗状況</h2>
+  <div id="status-progress"></div>
+</div>
+
+<!-- 价格历史 -->
+<div class="card">
+  <h2>価格履歴</h2>
+  <div id="chart-price-history" class="chart"></div>
+</div>
+{% endblock %}
+{% block js %}my-list.js{% endblock %}

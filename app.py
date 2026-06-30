@@ -24,6 +24,11 @@ def page_listings():
     return render_template("listings.html")
 
 
+@app.route("/my-list")
+def page_my_list():
+    return render_template("my-list.html")
+
+
 @app.route("/rankings")
 def page_rankings():
     return render_template("rankings.html")
@@ -126,6 +131,102 @@ def api_region_detail(ward):
     if not row:
         return jsonify({"error": "not found"}), 404
     return jsonify(row)
+
+
+# ===== My List Analysis API =====
+
+@app.route("/api/my-list")
+def api_my_list():
+    """我的关注分析:导入房源 + 区域基准对比 + 雷达数据 + 价格历史 + 状态进度。"""
+    pref = query_one("SELECT * FROM user_preferences WHERE id=1")
+    max_cost = pref["max_total_monthly_cost"] if pref else 140000
+
+    # 所有导入房源(含评分 + 区域基准)
+    listings = query_all("""SELECT l.*, s.total_score, s.score_reason, s.commute_resolved,
+        s.budget_score, s.area_score, s.commute_score, s.floor_score, s.pet_score,
+        s.station_score, s.age_score, s.initial_cost_score,
+        r.avg_rent AS region_avg_rent, r.avg_area AS region_avg_area,
+        st.status AS fav_status
+        FROM rental_listings l
+        LEFT JOIN listing_scores s ON s.listing_id=l.id
+        LEFT JOIN region_stats r ON l.ward = r.ward
+        LEFT JOIN listing_status st ON st.listing_id=l.id
+        WHERE l.is_active=1 ORDER BY s.total_score DESC""")
+
+    # 指标卡
+    total = len(listings)
+    budget_match = len([l for l in listings if l.get("total_monthly_cost") and l["total_monthly_cost"] <= max_cost])
+    avg_cost = sum(l.get("total_monthly_cost") or 0 for l in listings) / total if total else 0
+    avg_score = sum(l.get("total_score") or 0 for l in listings) / total if total else 0
+    uncontacted = len([l for l in listings if not l.get("fav_status")])
+
+    # 散点数据(面积 vs 月額,带区域均价)
+    scatter_data = [{"x": l.get("area_m2"), "y": l.get("total_monthly_cost"),
+                     "name": l.get("title"), "ward": l.get("ward"),
+                     "region_avg": l.get("region_avg_rent")} for l in listings if l.get("area_m2") and l.get("total_monthly_cost")]
+
+    # 雷达数据(8维度,多套叠加)
+    radar_indicators = [
+        {"name": "予算", "max": 20}, {"name": "面積", "max": 15},
+        {"name": "通勤", "max": 15}, {"name": "階数", "max": 10},
+        {"name": "ペット", "max": 15}, {"name": "駅距離", "max": 10},
+        {"name": "築年数", "max": 10}, {"name": "初期費用", "max": 5},
+    ]
+    radar_series = [{
+        "value": [l.get("budget_score") or 0, l.get("area_score") or 0,
+                  l.get("commute_score") or 0, l.get("floor_score") or 0,
+                  l.get("pet_score") or 0, l.get("station_score") or 0,
+                  l.get("age_score") or 0, l.get("initial_cost_score") or 0],
+        "name": l.get("title", "?")[:20],
+    } for l in listings[:8]]  # 最多8套叠加
+
+    # 对比表数据
+    compare_rows = [{
+        "id": l["id"], "title": l.get("title"), "platform": l.get("platform"),
+        "ward": l.get("ward"), "total_monthly_cost": l.get("total_monthly_cost"),
+        "rent": l.get("rent"), "management_fee": l.get("management_fee"),
+        "initial_cost_estimate": l.get("initial_cost_estimate"),
+        "area_m2": l.get("area_m2"), "price_per_m2": l.get("price_per_m2"),
+        "layout": l.get("layout"), "floor": l.get("floor"),
+        "nearest_station": l.get("nearest_station"), "walk_minutes": l.get("walk_minutes"),
+        "building_age": l.get("building_age"), "pet_allowed": l.get("pet_allowed"),
+        "deposit": l.get("deposit"), "key_money": l.get("key_money"),
+        "commute_minutes": l.get("commute_minutes"), "commute_resolved": l.get("commute_resolved"),
+        "total_score": l.get("total_score"), "score_reason": l.get("score_reason"),
+        "region_avg_rent": l.get("region_avg_rent"),
+        "fav_status": l.get("fav_status"), "detail_url": l.get("detail_url"),
+    } for l in listings]
+
+    # 区域偏离度
+    deviations = [{
+        "name": l.get("title", "?")[:20],
+        "ward": l.get("ward"),
+        "total_monthly_cost": l.get("total_monthly_cost"),
+        "region_avg_rent": l.get("region_avg_rent"),
+        "deviation_pct": round((l["total_monthly_cost"] - l["region_avg_rent"]) / l["region_avg_rent"] * 100, 1)
+                        if l.get("total_monthly_cost") and l.get("region_avg_rent") else None,
+    } for l in listings if l.get("total_monthly_cost") and l.get("region_avg_rent")]
+
+    # 状态进度
+    status_progress = query_all("""SELECT status, COUNT(*) AS value FROM listing_status GROUP BY status""")
+
+    # 价格历史(有历史数据的物件)
+    price_history = query_all("""SELECT l.title, l.id, h.total_monthly_cost, h.checked_at
+        FROM listing_price_history h JOIN rental_listings l ON h.listing_id=l.id
+        ORDER BY l.id, h.checked_at""")
+
+    return jsonify({
+        "total": total, "budget_match": budget_match,
+        "avg_cost": int(avg_cost), "avg_score": round(avg_score, 1),
+        "uncontacted": uncontacted,
+        "scatter_data": scatter_data,
+        "radar_indicators": radar_indicators,
+        "radar_series": radar_series,
+        "compare_rows": compare_rows,
+        "deviations": deviations,
+        "status_progress": status_progress,
+        "price_history": price_history,
+    })
 
 
 # ===== Listings API =====
