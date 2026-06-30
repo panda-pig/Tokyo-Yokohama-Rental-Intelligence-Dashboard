@@ -58,8 +58,6 @@ def api_dashboard():
     budget_match = query_one(
         "SELECT COUNT(*) AS c FROM rental_listings WHERE is_active=1 AND total_monthly_cost <= ?",
         (pref["max_total_monthly_cost"],))["c"]
-    floor_2plus = query_one(
-        "SELECT COUNT(*) AS c FROM rental_listings WHERE is_active=1 AND floor >= 2")["c"]
     pet_count = query_one(
         "SELECT COUNT(*) AS c FROM rental_listings WHERE is_active=1 AND pet_allowed=1")["c"]
     avg_cost = query_one(
@@ -68,62 +66,66 @@ def api_dashboard():
         "SELECT AVG(area_m2) AS a FROM rental_listings WHERE is_active=1")["a"] or 0
     avg_score = query_one(
         "SELECT AVG(s.total_score) AS a FROM listing_scores s JOIN rental_listings l ON s.listing_id=l.id WHERE l.is_active=1")["a"] or 0
-    new_count = query_one(
-        "SELECT COUNT(*) AS c FROM rental_listings WHERE is_active=1 AND first_seen_at >= date('now','-7 days')")["c"]
+    fav_count = query_one("SELECT COUNT(*) AS c FROM listing_status")["c"]
+
+    # 区域基准数据
+    regions = query_all("SELECT * FROM region_stats ORDER BY avg_rent DESC")
+    # 东京23区平均租金
+    tokyo_regions = query_all("SELECT ward AS name, avg_rent AS value FROM region_stats WHERE prefecture='東京都' ORDER BY value DESC")
+    # 横浜各区
+    yokohama_regions = query_all("SELECT ward AS name, avg_rent AS value FROM region_stats WHERE city='横浜市' ORDER BY value DESC")
+
+    # 用户导入物件的区域分布
+    user_ward_dist = query_all(
+        "SELECT ward AS name, COUNT(*) AS value FROM rental_listings WHERE is_active=1 AND ward IS NOT NULL GROUP BY ward ORDER BY value DESC")
+
+    # 用户导入物件 vs 区域均价散点(带区域基准)
+    user_scatter = query_all("""SELECT l.area_m2 AS x, l.total_monthly_cost AS y,
+        l.title, l.ward, l.layout, r.avg_rent AS region_avg
+        FROM rental_listings l LEFT JOIN region_stats r ON l.ward = r.ward
+        WHERE l.is_active=1""")
+
+    # 平台来源
+    platform_dist = query_all(
+        "SELECT platform AS name, COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY platform")
+
+    # 价格历史
     price_drop = query_one("""SELECT COUNT(*) AS c FROM listing_price_history h
         JOIN rental_listings l ON h.listing_id=l.id
         WHERE l.is_active=1 AND l.total_monthly_cost < h.total_monthly_cost""")["c"]
-    fav_count = query_one("SELECT COUNT(*) AS c FROM listing_status")["c"]
 
-    area_rent = query_all(
-        "SELECT ward AS name, AVG(total_monthly_cost) AS value FROM rental_listings WHERE is_active=1 GROUP BY ward ORDER BY value DESC")
-    rent_dist = query_all("""SELECT
-        CASE WHEN total_monthly_cost < 80000 THEN '8万以下'
-             WHEN total_monthly_cost < 100000 THEN '8~10万'
-             WHEN total_monthly_cost < 120000 THEN '10~12万'
-             WHEN total_monthly_cost < 140000 THEN '12~14万'
-             WHEN total_monthly_cost < 160000 THEN '14~16万'
-             ELSE '16万以上' END AS name,
-        COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY name""")
-    area_dist = query_all("""SELECT
-        CASE WHEN area_m2 < 25 THEN '25㎡未満'
-             WHEN area_m2 < 35 THEN '25~35㎡'
-             WHEN area_m2 < 45 THEN '35~45㎡'
-             ELSE '45㎡以上' END AS name,
-        COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY name""")
-    scatter = query_all(
-        "SELECT area_m2 AS x, total_monthly_cost AS y, title, ward, layout FROM rental_listings WHERE is_active=1")
-    top10 = query_all("""SELECT l.title, s.total_score FROM listing_scores s
-        JOIN rental_listings l ON s.listing_id=l.id
-        WHERE l.is_active=1 ORDER BY s.total_score DESC LIMIT 10""")
-    layout_dist = query_all(
-        "SELECT layout AS name, COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY layout")
-    platform_dist = query_all(
-        "SELECT platform AS name, COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY platform")
-    floor_dist = query_all("""SELECT
-        CASE WHEN floor <= 1 THEN '1階' WHEN floor = 2 THEN '2階' WHEN floor = 3 THEN '3階'
-             ELSE '4階以上' END AS name,
-        COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY name""")
-    age_dist = query_all("""SELECT
-        CASE WHEN building_age <= 5 THEN '0~5年' WHEN building_age <= 10 THEN '6~10年'
-             WHEN building_age <= 20 THEN '11~20年' ELSE '21年以上' END AS name,
-        COUNT(*) AS value FROM rental_listings WHERE is_active=1 GROUP BY name""")
+    # 状态分布
     status_dist = query_all(
         "SELECT status AS name, COUNT(*) AS value FROM listing_status GROUP BY status")
 
     return jsonify({
         "total_listings": total, "budget_match_count": budget_match,
-        "floor_2plus_count": floor_2plus, "pet_allowed_count": pet_count,
+        "pet_allowed_count": pet_count,
         "average_total_cost": int(avg_cost), "average_area": round(avg_area, 1),
-        "average_score": round(avg_score, 1), "new_listing_count": new_count,
-        "price_drop_count": price_drop, "favorite_count": fav_count,
-        "area_rent_data": area_rent, "rent_distribution": rent_dist,
-        "area_distribution": area_dist, "scatter_data": scatter,
-        "top_score_listings": top10, "layout_distribution": layout_dist,
-        "platform_distribution": platform_dist, "floor_distribution": floor_dist,
-        "age_distribution": age_dist, "status_distribution": status_dist,
-        "price_history_chart": [],
+        "average_score": round(avg_score, 1),
+        "favorite_count": fav_count, "price_drop_count": price_drop,
+        "region_count": len(regions),
+        "regions": regions,
+        "tokyo_region_rent": tokyo_regions,
+        "yokohama_region_rent": yokohama_regions,
+        "user_ward_distribution": user_ward_dist,
+        "user_scatter": user_scatter,
+        "platform_distribution": platform_dist,
+        "status_distribution": status_dist,
     })
+
+
+@app.route("/api/regions")
+def api_regions():
+    return jsonify(query_all("SELECT * FROM region_stats ORDER BY prefecture, city, ward"))
+
+
+@app.route("/api/regions/<ward>")
+def api_region_detail(ward):
+    row = query_one("SELECT * FROM region_stats WHERE ward=?", (ward,))
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(row)
 
 
 # ===== Listings API =====

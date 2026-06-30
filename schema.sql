@@ -145,8 +145,24 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 区域基准统计表
+CREATE TABLE IF NOT EXISTS region_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prefecture TEXT,
+    city TEXT,
+    ward TEXT,
+    avg_rent INTEGER,
+    avg_area REAL,
+    avg_building_age INTEGER,
+    safety_level TEXT,
+    convenience_level TEXT,
+    environment_level TEXT,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_listings_hash ON rental_listings(listing_hash);
 CREATE INDEX IF NOT EXISTS idx_listings_platform ON rental_listings(platform);
 CREATE INDEX IF NOT EXISTS idx_listings_ward ON rental_listings(ward);
 CREATE INDEX IF NOT EXISTS idx_scores_total ON listing_scores(total_score);
+CREATE INDEX IF NOT EXISTS idx_region_ward ON region_stats(ward);
