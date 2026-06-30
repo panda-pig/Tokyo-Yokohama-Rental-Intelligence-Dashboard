@@ -280,7 +280,7 @@ def api_import_csv():
 
 @app.route("/api/import/detail", methods=["POST"])
 def api_import_detail():
-    """粘贴单个房源详情页 URL,自动解析入库 + 评分。"""
+    """粘贴单个房源详情页 URL,自动解析入库 + 评分。支持4平台。"""
     from scrapers.base import fetch_html
     from scripts.run_scrape import normalize, upsert_listing
     from scripts.recalculate_scores import recalculate
@@ -294,20 +294,25 @@ def api_import_detail():
     # 根据 URL 判断平台和解析器
     if "suumo.jp" in url:
         from scrapers.suumo_detail import parse_suumo_detail
-        platform = "SUUMO"
+        parser = parse_suumo_detail
     elif "homes.co.jp" in url:
-        return jsonify({"error": "HOMES 詳細ページ解析は未対応です。SUUMOのURLを入力してください。"}), 400
+        from scrapers.homes_detail import parse_homes_detail
+        parser = parse_homes_detail
     elif "athome.jp" in url:
-        return jsonify({"error": "athome 詳細ページ解析は未対応です。SUUMOのURLを入力してください。"}), 400
+        from scrapers.athome_detail import parse_athome_detail
+        parser = parse_athome_detail
+    elif "yahoo.co.jp" in url or "realestate.yahoo.co.jp" in url:
+        from scrapers.yahoo_detail import parse_yahoo_detail
+        parser = parse_yahoo_detail
     else:
-        return jsonify({"error": "サポートされていないURLです。SUUMOの物件詳細URLを入力してください。"}), 400
+        return jsonify({"error": "サポートされていないURLです。SUUMO/HOMES/athome/Yahoo!不動産の物件詳細URLを入力してください。"}), 400
 
     html = fetch_html(url)
     if html is None:
         return jsonify({"error": "ページの取得に失敗しました。robots.txtまたはネットワークエラーの可能性があります。"}), 500
 
     try:
-        raw = parse_suumo_detail(html, url)
+        raw = parser(html, url)
         if not raw.title:
             return jsonify({"error": "物件情報の解析に失敗しました。詳細ページのURLが正しいか確認してください。"}), 500
     except Exception as e:
