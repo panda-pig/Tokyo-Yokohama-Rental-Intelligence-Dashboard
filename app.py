@@ -1,7 +1,15 @@
 from flask import Flask, jsonify, request, render_template
 from db_helper import query_all, query_one, execute
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scripts.init_db import init_db
 
 app = Flask(__name__)
+
+# 启动时自动建表(幂等,首次部署或磁盘重置后生效)
+init_db()
 
 
 # ===== Pages =====
