@@ -130,6 +130,41 @@ def test_kawasaki_no_pref():
     assert r["prefecture"] == "神奈川県"
     assert r["city"] == "川崎市"
 
+def test_osaka():
+    r = parse_address("大阪府大阪市中央区難波4-1")
+    assert r["prefecture"] == "大阪府"
+    assert r["city"] == "大阪市"
+    assert r["ward"] == "中央区"
+
+def test_kyoto():
+    r = parse_address("京都府京都市中京区烏丸通")
+    assert r["prefecture"] == "京都府"
+    assert r["city"] == "京都市"
+    assert r["ward"] == "中京区"
+
+def test_nagoya():
+    r = parse_address("愛知県名古屋市中区栄1-1")
+    assert r["prefecture"] == "愛知県"
+    assert r["city"] == "名古屋市"
+    assert r["ward"] == "中区"
+
+def test_fukuoka():
+    r = parse_address("福岡県福岡市中央区天神1-1")
+    assert r["prefecture"] == "福岡県"
+    assert r["city"] == "福岡市"
+    assert r["ward"] == "中央区"
+
+def test_sapporo():
+    r = parse_address("北海道札幌市中央区北1条西1")
+    assert r["prefecture"] == "北海道"
+    assert r["city"] == "札幌市"
+    assert r["ward"] == "中央区"
+
+def test_sapporo_no_pref():
+    r = parse_address("札幌市中央区北1条西1")
+    assert r["prefecture"] == "北海道"
+    assert r["city"] == "札幌市"
+
 def test_none():
     r = parse_address(None)
     assert r["prefecture"] is None
