@@ -229,7 +229,7 @@ function renderPriceHistory(history) {
   const groups = {};
   history.forEach(h => { if (!groups[h.id]) groups[h.id] = { name: h.title, dates: [], costs: [] }; groups[h.id].dates.push(h.checked_at); groups[h.id].costs.push(h.total_monthly_cost); });
   const series = Object.values(groups).map((g, i) => ({
-    name: g.name[:20], type: 'line', smooth: true,
+    name: g.name ? g.name.substring(0, 20) : '?', type: 'line', smooth: true,
     data: g.costs, itemStyle: { color: CHART.palette[i % CHART.palette.length] },
   }));
   const dates = Object.values(groups)[0]?.dates || [];
