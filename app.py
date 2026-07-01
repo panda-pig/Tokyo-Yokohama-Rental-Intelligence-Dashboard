@@ -183,7 +183,8 @@ def api_my_list():
         s.budget_score, s.area_score, s.commute_score, s.floor_score, s.pet_score,
         s.station_score, s.age_score, s.initial_cost_score,
         r.avg_rent AS region_avg_rent, r.avg_area AS region_avg_area,
-        st.status AS fav_status
+        r.avg_building_age AS region_avg_age,
+        st.id AS fav_status_id, st.status AS fav_status
         FROM rental_listings l
         LEFT JOIN listing_scores s ON s.listing_id=l.id
         LEFT JOIN region_stats r ON l.ward = r.ward
@@ -230,8 +231,14 @@ def api_my_list():
         "deposit": l.get("deposit"), "key_money": l.get("key_money"),
         "commute_minutes": l.get("commute_minutes"), "commute_resolved": l.get("commute_resolved"),
         "total_score": l.get("total_score"), "score_reason": l.get("score_reason"),
+        "budget_score": l.get("budget_score"), "area_score": l.get("area_score"),
+        "commute_score": l.get("commute_score"), "floor_score": l.get("floor_score"),
+        "pet_score": l.get("pet_score"), "station_score": l.get("station_score"),
+        "age_score": l.get("age_score"), "initial_cost_score": l.get("initial_cost_score"),
         "region_avg_rent": l.get("region_avg_rent"),
-        "fav_status": l.get("fav_status"), "detail_url": l.get("detail_url"),
+        "region_avg_area": l.get("region_avg_area"), "region_avg_age": l.get("region_avg_age"),
+        "fav_status": l.get("fav_status"), "fav_status_id": l.get("fav_status_id"),
+        "detail_url": l.get("detail_url"),
     } for l in listings]
 
     # 区域偏离度
@@ -466,6 +473,7 @@ def api_import_detail():
 
     return jsonify({
         "status": status,
+        "id": listing_id,
         "title": raw.title,
         "message": f"「{raw.title}」を{'追加' if status == 'inserted' else '更新'}しました"
     })
@@ -601,4 +609,5 @@ def api_recalculate():
 
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG") == "1")
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")),
+            debug=os.getenv("FLASK_DEBUG") == "1")

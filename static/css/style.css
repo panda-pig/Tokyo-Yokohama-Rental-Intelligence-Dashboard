@@ -303,6 +303,44 @@ body {
   font-size: 12px;
 }
 
+.btn-outline {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-outline:hover {
+  background: var(--bg-alt);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.btn-good {
+  background: var(--good-bg);
+  border: 1px solid var(--good-border);
+  color: var(--good);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
 /* ===== Filters ===== */
 .filters {
   display: grid;
