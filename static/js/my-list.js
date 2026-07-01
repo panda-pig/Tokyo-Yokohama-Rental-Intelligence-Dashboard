@@ -3,23 +3,32 @@ async function importAndAnalyze() {
   const url = document.getElementById('import-url').value.trim();
   const el = document.getElementById('import-result');
   if (!url) { el.innerHTML = '<span style="color:var(--bad);">URLを入力してください</span>'; return; }
-  el.textContent = '解析中... (数秒かかります)';
+  el.innerHTML = '<span style="color:var(--text-muted);">解析中... (数秒かかります)</span>';
   try {
     const res = await fetch('/api/import/detail', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      try {
+        const errJson = JSON.parse(errText);
+        el.innerHTML = '<span style="color:var(--bad);">' + (errJson.error || '解析エラー') + '</span>';
+      } catch(e2) {
+        el.innerHTML = '<span style="color:var(--bad);">解析に失敗しました(HTTP ' + res.status + ')</span>';
+      }
+      return;
+    }
     const d = await res.json();
     if (d.error) {
-      el.innerHTML = `<span style="color:var(--bad);">${d.error}</span>`;
+      el.innerHTML = '<span style="color:var(--bad);">' + d.error + '</span>';
     } else {
-      el.innerHTML = `<span style="color:var(--good);font-weight:600;">${d.message}</span> \
-        <span style="color:var(--text-muted);margin-left:8px;">スコア分析を更新しました</span>`;
+      el.innerHTML = '<span style="color:var(--good);font-weight:600;">' + d.message + '</span>';
       document.getElementById('import-url').value = '';
-      load();  // 重新加载分析图表
+      load();
     }
   } catch (e) {
-    el.innerHTML = '<span style="color:var(--bad);">通信エラー</span>';
+    el.innerHTML = '<span style="color:var(--bad);">通信エラー: ' + e.message + '</span>';
   }
 }
 
